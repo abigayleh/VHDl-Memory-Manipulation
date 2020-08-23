@@ -1,0 +1,143 @@
+library ieee;
+use ieee.std_logic_1164.all;
+USE IEEE.NUMERIC_STD.ALL;
+
+entity product is
+
+	port( clk, reset: in std_logic;
+			A, B: in std_logic_vector(31 downto 0);
+			P: out std_logic_vector(31 downto 0);
+			done: out std_logic);
+	
+end product;
+
+architecture t of product is
+
+component axi_lite_fpmul is
+  port( ACLK, ARESETn: in std_logic;
+        -- Write Address Channel from master
+        AWVALID: in std_logic;
+        AWREADY: buffer std_logic;
+        AWADDR: in std_logic_vector(31 downto 0);
+        AWPROT: in std_logic_vector(2 downto 0);
+        -- Write Data Channel from master
+        WVALID: in std_logic;
+        WREADY: buffer std_logic;
+        WDATA: in std_logic_vector(31 downto 0);
+        WSTRB: in std_logic_vector(3 downto 0);
+        -- Write Response Channel to master
+        BVALID: buffer std_logic;
+        BREADY: in std_logic;
+        BRESP: buffer std_logic_vector(1 downto 0);
+        -- Read Address Channel from master
+        ARVALID: in std_logic;
+        ARREADY: buffer std_logic;
+        ARADDR: in std_logic_vector(31 downto 0);
+        ARPROT: in std_logic_vector(2 downto 0);
+        -- Read Data Channel to master
+        RVALID: buffer std_logic;
+        RREADY: in std_logic;
+        RDATA: buffer std_logic_vector(31 downto 0);
+        RRESP: buffer std_logic_vector(1 downto 0));
+end component;
+
+signal addressA: std_logic_vector(31 downto 0) := "00000000000000000000000000000000";
+signal addressB: std_logic_vector(31 downto 0) := "00000000000000000000000000000001";
+signal addressP: std_logic_vector(31 downto 0) := "00000000000000000000000000000011";
+
+signal AWVALID: std_logic;
+signal AWADDR: std_logic_vector(31 downto 0);
+signal AWPROT: std_logic_vector(2 downto 0);
+signal WVALID: std_logic;
+signal WDATA: std_logic_vector(31 downto 0);
+signal WSTRB: std_logic_vector(3 downto 0);
+signal BREADY: std_logic;
+signal ARVALID: std_logic;
+signal ARADDR: std_logic_vector(31 downto 0);
+signal ARPROT: std_logic_vector(2 downto 0);
+signal RREADY: std_logic;
+
+signal AWREADY: std_logic;
+signal WREADY: std_logic;
+signal BVALID: std_logic;
+signal BRESP: std_logic_vector(1 downto 0);
+signal ARREADY: std_logic;
+signal RVALID: std_logic;
+signal RDATA: std_logic_vector(31 downto 0);
+signal RRESP: std_logic_vector(1 downto 0);
+
+begin
+
+axi: axi_lite_fpmul port map (clk, reset, AWVALID, AWREADY, AWADDR, AWPROT, WVALID, WREADY, WDATA, 
+WSTRB, BVALID, BREADY, BRESP, ARVALID, ARREADY, ARADDR, ARPROT, RVALID, RREADY, RDATA, RRESP);
+
+main: process is
+begin
+
+	done <= '0';
+	--Write A data
+	AWVALID <= '0';
+	
+	wait until AWREADY = '0';
+	AWADDR <= addressA;
+	AWVALID <= '1';
+	--Allow address to be written
+	wait for 20 ns;
+	WVALID <= '0';
+	
+	wait until WREADY = '0';
+	WDATA <= A;
+	--Allow for data to be properly written
+	wait for 10ns;
+	WVALID <= '1';
+	
+	wait until BVALID = '0';
+	BREADY <= '0';
+	
+	wait for 5ns;
+	BREADY <= '1';
+	
+	--Write B data
+	AWVALID <= '0';
+	
+	wait until AWREADY = '0';
+	AWADDR <= addressB;
+	AWVALID <= '1';
+	--Allow address to be written
+	wait for 20 ns;
+	WVALID <= '0';
+	
+	wait until WREADY = '0';
+	WDATA <= B;
+	--Allow for data to be properly written
+	wait for 10ns;
+	wait for 5ns;
+	WVALID <= '1';
+	
+	wait until BVALID = '0';
+	BREADY <= '0';
+	
+	wait for 5ns;
+	BREADY <= '1';
+	
+	wait for 20ns;
+	
+	--Read the result
+	ARVALID <= '0';
+	
+	wait until (ARREADY = '0');
+	ARADDR <= addressP;
+	ARVALID <= '1';
+	--Allow for address to be written
+	wait for 20ns;
+	
+	RREADY <= '0';
+	
+	wait until (RVALID = '0');
+	P <= RDATA;
+	RREADY <= '1';
+	
+	
+end process;
+
+end t;

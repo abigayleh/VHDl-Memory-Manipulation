@@ -1,0 +1,96 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity fpmul is
+  port( A, B: in std_logic_vector(31 downto 0);
+			clk: in std_logic;
+			P: out std_logic_vector(31 downto 0));
+end fpmul;
+
+architecture t of fpmul is
+
+--Sign bits of A and B
+signal signA: std_logic;
+signal signB: std_logic;
+
+--23 bit fractions of A and B
+signal fractionA: std_logic_vector(22 downto 0);
+signal fractionB: std_logic_vector(22 downto 0);
+
+--8 bit exponents of A and B
+signal exponentA: std_logic_vector(7 downto 0);
+signal exponentB: std_logic_vector(7 downto 0);
+
+--Holder for Product parts
+signal signP: std_logic;
+signal fractionP: std_logic_vector(22 downto 0);
+signal exponentP: std_logic_vector(7 downto 0);
+
+--Exponents are added and subtracted by 127 (here in twos complement form)
+signal exponent: std_logic_vector(7 downto 0) := "10000001";
+
+--Leading bit ones are added back when multiplying the fractions 
+signal mula: std_logic_vector(23 downto 0) := "100000000000000000000000";
+signal mulb: std_logic_vector(23 downto 0) := "100000000000000000000000";
+
+signal exponentHold: std_logic_vector(7 downto 0);
+signal hold: std_logic_vector(47 downto 0);
+
+begin
+
+process (signA, signB, fractionA, fractionB, exponentA, exponentB, hold, exponentP, fractionP, signP, clk)
+
+begin
+
+if(rising_edge(clk)) then
+
+--Assign parts to holders
+signA <= A(31);
+signB <= B(31);
+
+fractionA <= A(22 downto 0);
+fractionB <= B(22 downto 0);
+
+exponentA <= A(30 downto 23);
+exponentB <= B(30 downto 23);
+	
+	--If one fraction is zero, product will be zero
+	if(fractionA = "00000000000000000000000" or fractionB = "00000000000000000000000") then
+		
+		P <= "00000000000000000000000000000000";
+		
+	else
+	
+		--Find sign of product
+		if((signA = '1' and signB = '1') or (signA = '0' and signB = '0')) then
+			signP <= '0';
+		else
+			signP <= '1';
+		end if;
+
+		--Multiply fractions to get product fraction
+		--Add leading ones to fractions A and B
+		mula(22 downto 0) <= fractionA;
+		mulb(22 downto 0) <= fractionB;
+		hold <= std_logic_vector(unsigned(mulA) * unsigned(mulB));
+		
+		--Fraction is the most significant 23 bits of the product
+		fractionP <= hold(46 downto 24);
+
+		--Find product exponent by adding exponents together and subtracting 127
+		exponentHold <= std_logic_vector(unsigned(exponentA) + unsigned(exponentB));
+		exponentP <= std_logic_vector(unsigned(exponentHold) + unsigned(exponent));
+	
+		--Assign results to output	
+		P(31) <= signP;
+		P(30 downto 23) <= exponentP;
+		P(22 downto 0) <= fractionP;
+		
+	end if;
+
+end if;
+
+end process;
+
+end t;

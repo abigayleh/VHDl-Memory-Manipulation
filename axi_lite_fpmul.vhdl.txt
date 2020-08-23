@@ -1,0 +1,143 @@
+-- AXI4-Lite Floating Point Multiplier Interface
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity axi_lite_fpmul is
+  port( ACLK, ARESETn: in std_logic;
+        -- Write Address Channel from master
+        AWVALID: in std_logic;
+        AWREADY: buffer std_logic := '1';
+        AWADDR: in std_logic_vector(31 downto 0);
+        AWPROT: in std_logic_vector(2 downto 0);
+        -- Write Data Channel from master
+        WVALID: in std_logic;
+        WREADY: buffer std_logic := '1';
+        WDATA: in std_logic_vector(31 downto 0);
+        WSTRB: in std_logic_vector(3 downto 0);
+        -- Write Response Channel to master
+        BVALID: buffer std_logic := '1';
+        BREADY: in std_logic;
+        BRESP: buffer std_logic_vector(1 downto 0);
+        -- Read Address Channel from master
+        ARVALID: in std_logic;
+        ARREADY: buffer std_logic := '1';
+        ARADDR: in std_logic_vector(31 downto 0);
+        ARPROT: in std_logic_vector(2 downto 0);
+        -- Read Data Channel to master
+        RVALID: buffer std_logic := '1';
+        RREADY: in std_logic;
+        RDATA: buffer std_logic_vector(31 downto 0);
+        RRESP: buffer std_logic_vector(1 downto 0));
+end axi_lite_fpmul;
+
+architecture rtl of axi_lite_fpmul is
+
+component fpmul is
+  port( A, B: in std_logic_vector(31 downto 0);
+			clk: in std_logic;
+			P: out std_logic_vector(31 downto 0));
+end component;
+
+--Input A
+signal A: std_logic_vector(31 downto 0);
+--Input B
+signal B: std_logic_vector(31 downto 0);
+--Output P
+signal P: std_logic_vector(31 downto 0);
+
+--Correct addresses for inputs and output
+signal addressA: std_logic_vector(31 downto 0) := "00000000000000000000000000000000";
+signal addressB: std_logic_vector(31 downto 0) := "00000000000000000000000000000001";
+signal addressP: std_logic_vector(31 downto 0) := "00000000000000000000000000000011";
+
+signal validA: std_logic := '0';
+signal validB: std_logic := '0';
+signal validP: std_logic := '0';
+
+begin
+
+multiply: fpmul port map(A, B, aclk, P);
+
+process (aclk, awvalid, wvalid, awaddr, wready)
+begin
+
+--Write to an address
+if(rising_edge(ACLK)) then
+	
+	if(ARESETn = '1') then
+		AWREADY <= '1';
+		WREADY <= '1';
+		BVALID <= '1';
+		ARREADY <= '1';
+		RVALID <= '1';
+	
+	--Write
+	elsif(AWVALID = '0') then
+		BVALID <= '1';
+		AWREADY <= '0';
+		
+	elsif(WVALID = '0') then
+	
+		AWREADY <= '1';
+		WREADY <= '0';
+		--If addressA, the data is A
+		if(AWADDR = addressA) then
+			
+			A <= WDATA;
+			validA <= '1';
+		
+		--If addressB, the data is B
+		elsif (AWADDR = addressB) then
+		
+			B <= WDATA;
+			validB <= '1';
+			
+		end if;
+		
+	elsif(AWADDR /= addressA and AWADDR /= addressB and WREADY = '0') then
+			
+			WREADY <= '1';
+			BRESP <= "10";
+			BVALID <= '0';
+		
+	elsif(WREADY = '0') then
+		 
+			WREADY <= '1';
+			BRESP <= "00";
+			BVALID <= '0';
+	
+	end if;
+	
+	--Read P
+	if (ARVALID = '0') then
+		BVALID <= '1';
+		ARREADY <= '0';
+		
+	elsif(RREADY <= '0') then
+		RDATA <= P;	
+		RVALID <= '0';
+		ARREADY <= '1';
+	
+	elsif(RVALID = '0') then
+		
+		if(ARADDR /= addressP or validA = '0' or validB = '0') then
+	
+			RRESP <= "10";
+			validA <= '0';
+			validB <= '0';
+			RVALID <= '1';
+			
+		elsif(ARADDR = addressP and validA = '1' and validB = '1') then
+	
+			RRESP <= "00";
+			validA <= '0';
+			validB <= '0';
+			RVALID <= '1';
+		end if;
+	end if;
+
+end if;
+end process;
+end rtl;

@@ -1,0 +1,53 @@
+library ieee;
+use ieee.std_logic_1164.all;
+
+entity lab_project is
+  port (SW: in std_logic_vector(17 downto 0);  -- switches
+        KEY: in std_logic_vector(3 downto 0);  -- pushbuttons
+        CLOCK_50: in std_logic; -- 50 MHz clock input
+        LEDR: out std_logic_vector(17 downto 0); -- red LEDs
+        LEDG: out std_logic_vector(8 downto 0);  -- green LEDs
+        -- eight seven-segment display outputs
+        HEX0, HEX1, HEX2, HEX3, HEX4, HEX5,
+              HEX6, HEX7: out std_logic_vector(6 downto 0) := "0000001");
+end lab_project;
+
+architecture top of lab_project is
+
+component controller_axi_master is
+
+  port( ACLK, ARESETn: in std_logic;
+        -- User control signals
+	    op_a, op_b: in std_logic_vector(3 downto 0);
+        start: in std_logic; -- start multiplication of op_a * op_b
+	    data_out: out std_logic_vector(31 downto 0); -- product to 7-segment displays
+		 done: buffer std_logic);
+
+end component;
+
+component ALU is
+
+port ( 
+-- A represents higher switch, D represents lower switch
+A, B, C, D: in std_logic;
+HEX: out std_logic_vector(6 downto 0));
+
+end component;
+
+signal product: std_logic_vector(31 downto 0);
+
+begin
+--Key(0) represents the reset button
+--Key(3) represents the start button
+master: controller_axi_master port map(CLOCK_50, not key(0), SW(7 DOWNTO 4), SW(3 DOWNTO 0), not key(3), PRODUCT);
+
+zero: ALU port map(product(3), product(2), product(1), product(0), hex0);
+one: ALU PORT MAP(product(7), product(6), product(5), product(4), hex1);
+two: ALU PORT MAP(product(11), product(10), product(9), product(8), hex2);
+three: ALU PORT MAP(product(15), product(14), product(13), product(12), hex3);
+four: ALU PORT MAP(product(19), product(18), product(17), product(16), hex4);
+five: ALU PORT MAP(product(23), product(22), product(21), product(20), hex5);
+six: ALU PORT MAP(product(27), product(26), product(25), product(24), hex6);
+seven: ALU PORT MAP(product(31), product(30), product(29), product(28), hex7);
+
+end top;
